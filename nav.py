@@ -5,6 +5,7 @@ from re import match
 
 l = logger('catherd.nav')
 
+
 Location = namedtuple('Location', ['fn', 'line', 'col'])
 
 class History:
@@ -48,33 +49,43 @@ def find_window(boss):
 
 _enter = KeyEvent(key=GLFW_FKEY_ENTER)
 
+def parse_location(win):
+    last_line = win.as_text().split('\n')[-1]
+    m = match('\s*(.+?)\s+ \d+% . (\d+), (\d+)\s*', last_line)
+    fn, line, col = m.groups()
+    return Location(fn, int(line) - 1, int(col) - 1)
+
 def _send_command(w, command):
     keys = b''.join(w.encoded_key(KeyEvent(key=ord(c))) for c in 'o' + command)
     w.write_to_child(keys)
     w.write_to_child(w.encoded_key(_enter))
 
+def run_in_shell(win, command):
+    win.paste_text(command)
+    win.write_to_child(win.encoded_key(_enter))
+
 def edit(boss, fn, line=0, col=0, back=False):
     if is_vis_window(boss.active_window):
+        l.info("Using active for edit")
         win = boss.active_window
     else:
         win = find_window(boss)
+        l.info("Finding for edit found %s", win)
     address_cmd = f'{line}#{col}'
     l.info("Edit with %s:%s back=%s", fn, address_cmd, back)
-    if win is not None:
-        last_line = win.as_text().split('\n')[-1]
-        m = match('\s*(.+?)\s+ \d+% . (\d+), (\d+)\s*', last_line)
-        h = history(boss.active_tab)
-        h.locations.insert(h.idx, Location(*m.groups()))
-        if not back:
-            l.info("Bumping idx")
-            h.idx += 1
-        l.info("After edit history is %s idx %s", h.locations, h.idx)
-        _send_command(win, 'w')
-        _send_command(win, f'e {fn}')
-        _send_command(win, address_cmd)
-    else:
-        boss.active_window.paste_text(f"vise +{address_cmd} '{fn}'")
-        boss.active_window.write_to_child(win.encoded_key(_enter))
+    if win is None:
+        run_in_shell(boss.active_window, f"vise +{address_cmd} '{fn}'")
+        return
+    current_loc = parse_location(win)
+    h = history(boss.active_tab)
+    h.locations.insert(h.idx, current_loc)
+    if not back:
+        l.info("Bumping idx")
+        h.idx += 1
+    l.info("After edit history is %s idx %s", h.locations, h.idx)
+    _send_command(win, 'w')
+    _send_command(win, f'e {fn}')
+    _send_command(win, address_cmd)
 
 def move(boss, direction):
     h = history(boss.active_tab)

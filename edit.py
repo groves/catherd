@@ -1,3 +1,5 @@
+import importer
+importer.reload_catherd_modules()
 from log import logger
 from nav import edit
 from os import environ

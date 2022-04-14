@@ -1,3 +1,5 @@
+import importer
+importer.reload_catherd_modules()
 from kittens.tui.handler import result_handler
 from log import logger
 from nav import move

@@ -1,3 +1,5 @@
+import importer
+importer.reload_catherd_modules()
 from log import logger
 from kitty.fast_data_types import KeyEvent, GLFW_FKEY_ENTER, GLFW_FKEY_UP, GLFW_MOD_CONTROL
 from kittens.tui.handler import result_handler
@@ -36,4 +38,3 @@ def reterm(boss):
     setattr(tab, _id_attr, win.id)
     encoded_keys = b''.join(win.encoded_key(key) for key in keys)
     win.write_to_child(encoded_keys)
-    l.debug("Wrote keys")

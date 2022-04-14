@@ -1,6 +1,8 @@
 from sys import path
 if len(path) == 0 or path[0] != '/Users/groves/.config/kitty':
     path.insert(0, '/Users/groves/.config/kitty')
+import importer
+importer.reload_catherd_modules()
 from re import finditer
 from log import logger
 from nav import edit
@@ -17,7 +19,7 @@ def mark(text, args, Mark, extra_cli_args, *a):
             fn = line
         elif fn and m.group('line'):
             start, end = m.span()
-            yield Mark(idx, start, end, line, {'line':int(m.group('line')), 'fn':fn})
+            yield Mark(idx, start, end, line, {'line':int(m.group('line')) - 1, 'fn':fn})
             idx += 1
 
 def handle_result(args, data, target_window_id, boss, extra_cli_args, *a):
