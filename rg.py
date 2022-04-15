@@ -38,17 +38,22 @@ def rg(boss, args):
     else:
         rg_type = None
     
+    # Use the mouse selection as the ripgrep query if we don't have something more specific
     query = boss.active_window.text_for_selection()
-    if rg_type == 'py':
-        if reference:
-            query = f'(^|[ .@]){query}([^[[:alnum:]]_]|$)'
-        elif declaration:
+    if query == '':
+        l.info("Nothing selected, not querying")
+        return
+    # Haven't come up with a definition regexp for lua, so use the reference query for both styles for it
+    if reference or rg_type == 'lua':
+        if rg_type in ['py', 'lua', 'c']:
+            query = f'(^|[ .@(]){query}([^[[:alnum:]]_]|$)'
+    elif declaration:
+        if rg_type == 'py':
             query = f'''(def\s+{query}\(|(^|[ .]){query}\s*=|\[.{query}.]\s*=)'''
-    elif rg_type == 'c' or rg_type == 'lua':
-        # Haven't thought about decl for lua or c, just doing ref for everything now
-        query = f'(^|[ .@]){query}([^[[:alnum:]]_]|$)'
-    type_flag = f'--type {rg_type} ' if rg_type is not None else ''
-    cmd = f"rg {type_flag}--context 2 '{query}'"
+        elif rg_type == 'c':
+            query = f'''(\w+\s+){query}([^[[:alnum:]]_]|$)'''
+    type_flag = f' --type {rg_type}' if rg_type is not None else ''
+    cmd = f"rg --context 2 '{query}'{type_flag}"
     
     shell_win = _find_shell(boss)
     l.info("Got shell=%s, query=%s, loc=%s, rg_type=%s", shell_win, query, loc.fn, rg_type)

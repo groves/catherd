@@ -5,7 +5,6 @@ from re import match
 
 l = logger('catherd.nav')
 
-
 Location = namedtuple('Location', ['fn', 'line', 'col'])
 
 class History:
@@ -47,7 +46,6 @@ def find_window(boss):
             return possible
     return None
 
-_enter = KeyEvent(key=GLFW_FKEY_ENTER)
 
 def parse_location(win):
     last_line = win.as_text().split('\n')[-1]
@@ -55,6 +53,7 @@ def parse_location(win):
     fn, line, col = m.groups()
     return Location(fn, int(line) - 1, int(col) - 1)
 
+_enter = KeyEvent(key=GLFW_FKEY_ENTER)
 def _send_command(w, command):
     keys = b''.join(w.encoded_key(KeyEvent(key=ord(c))) for c in 'o' + command)
     w.write_to_child(keys)
@@ -72,7 +71,7 @@ def edit(boss, fn, line=0, col=0, back=False):
         win = find_window(boss)
         l.info("Finding for edit found %s", win)
     address_cmd = f'{line}#{col}'
-    l.info("Edit with %s:%s back=%s", fn, address_cmd, back)
+    l.info("Edit %s:%s back=%s", fn, address_cmd, back)
     if win is None:
         run_in_shell(boss.active_window, f"vise +{address_cmd} '{fn}'")
         return
@@ -80,7 +79,6 @@ def edit(boss, fn, line=0, col=0, back=False):
     h = history(boss.active_tab)
     h.locations.insert(h.idx, current_loc)
     if not back:
-        l.info("Bumping idx")
         h.idx += 1
     l.info("After edit history is %s idx %s", h.locations, h.idx)
     _send_command(win, 'w')
