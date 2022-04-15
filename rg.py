@@ -46,12 +46,16 @@ def rg(boss, args):
     # Haven't come up with a definition regexp for lua, so use the reference query for both styles for it
     if reference or rg_type == 'lua':
         if rg_type in ['py', 'lua', 'c']:
-            query = f'(^|[ .@(]){query}([^[[:alnum:]]_]|$)'
+            query = f'(^|[ .@(&]){query}([^[[:alnum:]]_]|$)'
     elif declaration:
         if rg_type == 'py':
             query = f'''(def\s+{query}\(|(^|[ .]){query}\s*=|\[.{query}.]\s*=)'''
         elif rg_type == 'c':
-            query = f'''(\w+\s+){query}([^[[:alnum:]]_]|$)'''
+            # This gets a word followed by a possible pointer declaration followed by the query word exactly.
+            # It gets macro definitions as well as C declarations.
+            # It'll pick up false positives like the query in a comment, but doing that feels better than 
+            # making this super complicated.
+            query = f'''(\w+\s+)\**{query}([^[[:alnum:]]_]|$)'''
     type_flag = f' --type {rg_type}' if rg_type is not None else ''
     cmd = f"rg --context 2 '{query}'{type_flag}"
     
