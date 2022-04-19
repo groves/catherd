@@ -40,12 +40,11 @@ def is_vis_window(w):
     process = w.child.foreground_processes[0]
     return process['cmdline'][0].endswith('/vis')
 
-def find_window(boss):
+def find_vis_window(boss):
     for possible in boss.active_tab.windows:
         if is_vis_window(possible):
             return possible
     return None
-
 
 def parse_status(win):
     last_line = win.as_text().split('\n')[-1]
@@ -67,18 +66,27 @@ def run_in_shell(win, command):
     win.paste_text(command)
     win.write_to_child(win.encoded_key(_enter))
 
-def edit(boss, fn, line=0, col=0, back=False):
+def edit(boss, fn, line=0, col=0, back=False, relative_to_active=True):
+    address_cmd = f'{line}#{col}'
+    l.info("Edit %s:%s back=%s", fn, address_cmd, back)
     if is_vis_window(boss.active_window):
         l.info("Using active for edit")
         win = boss.active_window
     else:
-        win = find_window(boss)
+        win = find_vis_window(boss)
         l.info("Finding for edit found %s", win)
-    address_cmd = f'{line}#{col}'
-    l.info("Edit %s:%s back=%s", fn, address_cmd, back)
-    if win is None:
-        run_in_shell(boss.active_window, f"vise +{address_cmd} '{fn}'")
-        return
+        if win is None:
+            run_in_shell(boss.active_window, f"vise +{address_cmd} '{fn}'")
+            return
+        if relative_to_active:
+            active_cwd = boss.active_window.cwd_of_child
+            if active_cwd is None:
+                active_cwd = boss.active_window.child.cwd
+            if active_cwd is not None:
+                if not fn.startswith('/'):
+                    fn = f'{active_cwd}/{fn}'
+                else:
+                    l.info("Couldn't find cwd for active win %s, not able to make fn %s relative to active", win, fn)
     current_loc, modified, mode = parse_status(win)
     if mode != 'NORMAL':
         # Use C-x to exit normal mode to avoid weirdness with escdelay in vis
@@ -100,4 +108,4 @@ def move(boss, direction):
     if dest is None:
         l.info("No history in that direction, skippin'")
         return
-    edit(boss, *dest, back=direction=='back')
+    edit(boss, *dest, back=direction=='back', relative_to_active=False)

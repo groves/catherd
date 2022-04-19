@@ -6,7 +6,7 @@ importer.reload_catherd_modules()
 from re import finditer
 from log import logger
 from nav import edit
-from os.path import exists
+from os.path import abspath, exists
 
 l = logger('catherd.hint_rg')
 
@@ -16,7 +16,7 @@ def mark(text, args, Mark, extra_cli_args, *a):
     for m in finditer('((?P<line>\d+):.*|.*)', text):
         line = m.group().replace('\0', '')
         if exists(line):
-            fn = line
+            fn = abspath(line)
         elif fn and m.group('line'):
             start, end = m.span()
             yield Mark(idx, start, end, line, {'line':int(m.group('line')) - 1, 'fn':fn})
@@ -24,6 +24,6 @@ def mark(text, args, Mark, extra_cli_args, *a):
 
 def handle_result(args, data, target_window_id, boss, extra_cli_args, *a):
     try:
-        edit(boss, **data['groupdicts'][0])
+        edit(boss, **data['groupdicts'][0], relative_to_active=False)
     except:
         l.exception('hint_rg blew chunks!')
