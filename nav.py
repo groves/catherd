@@ -1,5 +1,5 @@
 from collections import namedtuple
-from kitty.fast_data_types import KeyEvent, GLFW_FKEY_ENTER
+from kitty.fast_data_types import KeyEvent, GLFW_FKEY_ENTER, GLFW_MOD_CONTROL
 from log import logger
 from re import match
 
@@ -47,11 +47,15 @@ def find_window(boss):
     return None
 
 
-def parse_location(win):
+def parse_status(win):
     last_line = win.as_text().split('\n')[-1]
-    m = match('\s*(.+?)\s+ \d+% . (\d+), (\d+)\s*', last_line)
-    fn, line, col = m.groups()
-    return Location(fn, int(line) - 1, int(col) - 1)
+    m = match('\s*(?P<mode>INSERT » |VISUAL » |VISUAL-LINE » )?(?P<fn>.+?)(?P<modified>\[\+\])?\s+ \d+% . (?P<line>\d+), (?P<col>\d+)\s*', last_line)
+    mode, fn, modified, line, col = m.groups()
+    if mode is not None:
+        mode = mode.split(' ')[0]
+    else:
+        mode = 'NORMAL'
+    return Location(fn, int(line) - 1, int(col) - 1), modified is not None, mode
 
 _enter = KeyEvent(key=GLFW_FKEY_ENTER)
 def _send_command(w, command):
@@ -75,13 +79,17 @@ def edit(boss, fn, line=0, col=0, back=False):
     if win is None:
         run_in_shell(boss.active_window, f"vise +{address_cmd} '{fn}'")
         return
-    current_loc = parse_location(win)
+    current_loc, modified, mode = parse_status(win)
+    if mode != 'NORMAL':
+        # Use C-x to exit normal mode to avoid weirdness with escdelay in vis
+        win.write_to_child(win.encoded_key(KeyEvent(key=ord('x'), mods=GLFW_MOD_CONTROL)))
+    if modified:
+        _send_command(win, 'w')
     h = history(boss.active_tab)
     h.locations.insert(h.idx, current_loc)
     if not back:
         h.idx += 1
     l.info("After edit history is %s idx %s", h.locations, h.idx)
-    _send_command(win, 'w')
     _send_command(win, f'e {fn}')
     _send_command(win, address_cmd)
 

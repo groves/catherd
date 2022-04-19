@@ -2,7 +2,7 @@ import importer
 importer.reload_catherd_modules()
 from kittens.tui.handler import result_handler
 from log import logger
-from nav import parse_location, run_in_shell
+from nav import parse_status, run_in_shell
 
 l = logger('catherd.rg')
 
@@ -27,7 +27,7 @@ def rg(boss, args):
     reference = args[1] == 'reference'
     declaration = args[1] == 'declaration'
     
-    loc = parse_location(boss.active_window)
+    loc, _, _ = parse_status(boss.active_window)
     ext = loc.fn.split('.')[-1]
     if ext == 'py':
         rg_type = 'py'
