@@ -46,7 +46,7 @@ def rg(boss, args):
     # Haven't come up with a definition regexp for lua, so use the reference query for both styles for it
     if reference or rg_type == 'lua':
         if rg_type in ['py', 'lua', 'c']:
-            query = f'(^|[ .@(&]){query}([^[[:alnum:]]_]|$)'
+            query = f'(^|[ .@(&!]){query}([^[[:alnum:]]_]|$)'
     elif declaration:
         if rg_type == 'py':
             query = f'''(def\s+{query}\(|(^|[ .]){query}\s*=|\[.{query}.]\s*=)'''
