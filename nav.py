@@ -1,6 +1,7 @@
 from collections import namedtuple
 from kitty.fast_data_types import KeyEvent, GLFW_FKEY_ENTER, GLFW_MOD_CONTROL
 from log import logger
+from os.path import normpath
 from re import compile
 
 l = logger('catherd.nav')
@@ -73,40 +74,55 @@ def run_in_shell(win, command):
     win.paste_text(command)
     win.write_to_child(win.encoded_key(_enter))
 
-def edit(boss, fn, line=0, col=0, back=False, relative_to_active=True):
+def abspath_in_win(win, fn):
+    cwd = win.cwd_of_child
+    if cwd is None:
+        cwd = win.child.cwd
+        if cwd is None:
+            raise Exception(f"Couldn't find cwd for win {win}")
+    if not fn.startswith('/'):
+        fn = f'{cwd}/{fn}'
+    return normpath(fn)
+
+def edit(boss, fn, line=0, col=0, back=False):
+    fn = abspath_in_win(boss.active_window, fn)
+    h = history(boss.active_tab)
+    if line == 0 and col == 0:
+        for idx, (past_fn, past_line, past_col) in enumerate(h.locations):
+            if past_fn == fn:
+                l.info("Found past edit of %s, using its line and col", fn)
+                h.locations.pop(idx)
+                if idx < h.idx:
+                    h.idx -= 1
+                line = past_line
+                col = past_col
+                break
     address_cmd = f'{line}#{col}'
     l.info("Edit %s:%s back=%s", fn, address_cmd, back)
+
     if is_vis_window(boss.active_window):
         l.info("Using active for edit")
-        win = boss.active_window
+        edit_win = boss.active_window
     else:
-        win = find_vis_window(boss)
-        l.info("Finding for edit found %s", win)
-        if win is None:
+        edit_win = find_vis_window(boss)
+        l.info("Finding for edit found %s", edit_win)
+        if edit_win is None:
             run_in_shell(boss.active_window, f"vise +{address_cmd} '{fn}'")
             return
-        if relative_to_active:
-            active_cwd = boss.active_window.cwd_of_child
-            if active_cwd is None:
-                active_cwd = boss.active_window.child.cwd
-            if active_cwd is not None:
-                if not fn.startswith('/'):
-                    fn = f'{active_cwd}/{fn}'
-                else:
-                    l.info("Couldn't find cwd for active win %s, not able to make fn %s relative to active", win, fn)
-    current_loc, modified, mode = parse_status(win)
+
+    current_loc, modified, mode = parse_status(edit_win)
+    current_loc = Location(abspath_in_win(edit_win, current_loc.fn), current_loc.line, current_loc.col)
     if mode != 'NORMAL':
         # Use C-x to exit normal mode to avoid weirdness with escdelay in vis
-        win.write_to_child(win.encoded_key(KeyEvent(key=ord('x'), mods=GLFW_MOD_CONTROL)))
+        edit_win.write_to_child(edit_win.encoded_key(KeyEvent(key=ord('x'), mods=GLFW_MOD_CONTROL)))
     if modified:
-        _send_command(win, 'w')
-    h = history(boss.active_tab)
+        _send_command(edit_win, 'w')
     h.locations.insert(h.idx, current_loc)
     if not back:
         h.idx += 1
     l.info("After edit history is %s idx %s", h.locations, h.idx)
-    _send_command(win, f'e {fn}')
-    _send_command(win, address_cmd)
+    _send_command(edit_win, f'e {fn}')
+    _send_command(edit_win, address_cmd)
 
 def move(boss, direction):
     h = history(boss.active_tab)
@@ -115,4 +131,4 @@ def move(boss, direction):
     if dest is None:
         l.info("No history in that direction, skippin'")
         return
-    edit(boss, *dest, back=direction=='back', relative_to_active=False)
+    edit(boss, *dest, back=direction=='back')

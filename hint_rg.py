@@ -24,6 +24,6 @@ def mark(text, args, Mark, extra_cli_args, *a):
 
 def handle_result(args, data, target_window_id, boss, extra_cli_args, *a):
     try:
-        edit(boss, **data['groupdicts'][0], relative_to_active=False)
+        edit(boss, **data['groupdicts'][0])
     except:
         l.exception('hint_rg blew chunks!')
