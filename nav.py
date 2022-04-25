@@ -1,7 +1,7 @@
 from collections import namedtuple
 from kitty.fast_data_types import KeyEvent, GLFW_FKEY_ENTER, GLFW_MOD_CONTROL
 from log import logger
-from re import match
+from re import compile
 
 l = logger('catherd.nav')
 
@@ -46,15 +46,21 @@ def find_vis_window(boss):
             return possible
     return None
 
+_status_re = compile('\s*(?P<mode>INSERT » |VISUAL » |VISUAL-LINE » )?(?P<fn>.+?)(?P<modified> \[\+\])?\s+ (?:g « )?\d+% « (?P<line>\d+), (?P<col>\d+)\s*')
 def parse_status(win):
-    last_line = win.as_text().split('\n')[-1]
-    m = match('\s*(?P<mode>INSERT » |VISUAL » |VISUAL-LINE » )?(?P<fn>.+?)(?P<modified>\[\+\])?\s+ \d+% . (?P<line>\d+), (?P<col>\d+)\s*', last_line)
-    mode, fn, modified, line, col = m.groups()
-    if mode is not None:
-        mode = mode.split(' ')[0]
-    else:
-        mode = 'NORMAL'
-    return Location(fn, int(line) - 1, int(col) - 1), modified is not None, mode
+    for line in reversed(win.as_text().split('\n')):
+        l.info("Matching against %s", line)
+        m = _status_re.match(line)
+        if not m:
+            continue
+        mode, fn, modified, line, col = m.groups()
+        if mode is not None:
+            mode = mode.split(' ')[0]
+        else:
+            mode = 'NORMAL'
+        l.info('Found %s:%s#%s %s modified=%s', fn, line, col, mode, modified)
+        return Location(fn, int(line) - 1, int(col) - 1), modified is not None, mode
+    raise Exception(f"Couldn't find status in any line in {win}")
 
 _enter = KeyEvent(key=GLFW_FKEY_ENTER)
 def _send_command(w, command):
@@ -63,6 +69,7 @@ def _send_command(w, command):
     w.write_to_child(w.encoded_key(_enter))
 
 def run_in_shell(win, command):
+    l.info("Running '%s' in %s", command, win)
     win.paste_text(command)
     win.write_to_child(win.encoded_key(_enter))
 
