@@ -1,5 +1,6 @@
 from collections import namedtuple
 from kitty.fast_data_types import KeyEvent, GLFW_FKEY_ENTER, GLFW_MOD_CONTROL
+from kitty.utils import path_from_osc7_url
 from log import logger
 from os.path import normpath
 from re import compile
@@ -75,17 +76,19 @@ def run_in_shell(win, command):
     win.write_to_child(win.encoded_key(_enter))
 
 def abspath_in_win(win, fn):
-    cwd = win.cwd_of_child
+    cwd = win.screen.last_reported_cwd
     if cwd is None:
-        cwd = win.child.cwd
-        if cwd is None:
-            raise Exception(f"Couldn't find cwd for win {win}")
+        raise Exception(f"Couldn't find cwd for win {win}")
+    cwd = path_from_osc7_url(cwd)
+    l.info('cwd=%s fn=%s', cwd, fn)
     if not fn.startswith('/'):
         fn = f'{cwd}/{fn}'
+    l.info('fn=%s, np=%s', fn, normpath(fn))
     return normpath(fn)
 
 def edit(boss, fn, line=0, col=0, back=False):
-    fn = abspath_in_win(boss.active_window, fn)
+    # active_window_for_cwd uses the base of the active window group. If a kitten is running, active_window is an overlay on top of the window that invoked the kitten
+    fn = abspath_in_win(boss.active_window_for_cwd, fn)
     h = history(boss.active_tab)
     if line == 0 and col == 0:
         for idx, (past_fn, past_line, past_col) in enumerate(h.locations):
@@ -100,14 +103,14 @@ def edit(boss, fn, line=0, col=0, back=False):
     address_cmd = f'{line}#{col}'
     l.info("Edit %s:%s back=%s", fn, address_cmd, back)
 
-    if is_vis_window(boss.active_window):
+    if is_vis_window(boss.active_window_for_cwd):
         l.info("Using active for edit")
-        edit_win = boss.active_window
+        edit_win = boss.active_window_for_cwd
     else:
         edit_win = find_vis_window(boss)
         l.info("Finding for edit found %s", edit_win)
         if edit_win is None:
-            run_in_shell(boss.active_window, f"vise +{address_cmd} '{fn}'")
+            run_in_shell(boss.active_window_for_cwd, f"vise +{address_cmd} '{fn}'")
             return
 
     current_loc, modified, mode = parse_status(edit_win)
