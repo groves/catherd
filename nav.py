@@ -75,11 +75,14 @@ def run_in_shell(win, command):
     win.paste_text(command)
     win.write_to_child(win.encoded_key(_enter))
 
-def abspath_in_win(win, fn):
+def cwd_in_win(win):
     cwd = win.screen.last_reported_cwd
     if cwd is None:
         raise Exception(f"Couldn't find cwd for win {win}")
-    cwd = path_from_osc7_url(cwd)
+    return path_from_osc7_url(cwd)
+
+def abspath_in_win(win, fn):
+    cwd = cwd_in_win(win)
     l.info('cwd=%s fn=%s', cwd, fn)
     if not fn.startswith('/'):
         fn = f'{cwd}/{fn}'
