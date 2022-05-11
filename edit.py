@@ -1,6 +1,8 @@
 import importer
 importer.reload_catherd_modules()
 from log import logger
+from kitty.fast_data_types import add_timer
+from kitty.window import CwdRequest, CwdRequestType
 from kittens.tui.handler import result_handler
 from nav import cwd_in_win, edit, history, is_vis_window, parse_status, run_in_shell
 from os.path import relpath
@@ -20,8 +22,7 @@ def handle_result(args, answer, target_window_id, boss):
 def open_window(boss):
     win = boss.active_window
     cwd = cwd_in_win(win)
-    # We start the shell instead of passing a command to use the shell's path
-    new_win = boss.active_tab.new_window(use_shell=True, cwd=cwd, overlay_for=win.id)
+    new_win = boss.active_tab.new_window(cwd_from=CwdRequest(win, CwdRequestType.last_reported), overlay_for=win.id)
     def on_close_wrapper(b, w, d):
         try:
             on_close(b, w, d)
@@ -57,15 +58,18 @@ def open_window(boss):
     # Don't print any recents or the current file in fd
     exclusions = f""" --exclude '{"' --exclude '".join(excludes)}'""" if excludes else ''
 
-    run_in_shell(new_win, f'''set -l stdout (
-    begin
-        {print_recents}
-        fd --type file --hidden --follow --strip-cwd-prefix --exclude .git{exclusions}{prox_sort}
-    end |
-    fzf --tiebreak index
-) ; \
-python ~/dev/catherd/kitten-result.py $status "$stdout" ; \
-exit''')
+    def run_later(timer_id):
+        run_in_shell(new_win, f'''set -l stdout (
+        begin
+            {print_recents}
+            fd --type file --hidden --follow --strip-cwd-prefix --exclude .git{exclusions}{prox_sort}
+        end |
+        fzf --tiebreak index
+    ) ; \
+    python ~/dev/catherd/kitten-result.py $status "$stdout" ; \
+    exit''')
+    # Hack to wait for ssh to finish logging in before pasting our command
+    add_timer(run_later, .1, False)
 
 def on_close(boss, window, data):
     res = window.kitten_result
