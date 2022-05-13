@@ -1,10 +1,9 @@
 import importer
 importer.reload_catherd_modules()
 from log import logger
-from kitty.fast_data_types import add_timer
-from kitty.window import CwdRequest, CwdRequestType
+from kittens.ssh.main import set_cwd_in_cmdline
 from kittens.tui.handler import result_handler
-from nav import cwd_in_win, edit, history, is_vis_window, parse_status, run_in_shell
+from nav import cwd_in_win, edit, history, is_vis_window, parse_status
 from os.path import relpath
 
 l = logger('catherd.edit')
@@ -22,54 +21,57 @@ def handle_result(args, answer, target_window_id, boss):
 def open_window(boss):
     win = boss.active_window
     cwd = cwd_in_win(win)
-    new_win = boss.active_tab.new_window(cwd_from=CwdRequest(win, CwdRequestType.last_reported), overlay_for=win.id)
+
+    kwargs = {}
+    ssh_kitten_cmdline =  win.ssh_kitten_cmdline()
+    if ssh_kitten_cmdline:
+        cmd = ssh_kitten_cmdline
+        set_cwd_in_cmdline(cwd, cmd)
+        # Attach a tty to the shell since we want to interact with fzf
+        cmd.append('-t')
+    else:
+        kwargs['cwd'] = cwd
+        # `ssh command` implicitly runs the user's shell with -c, so we need to do that explicitly for local execution
+        # https://unix.stackexchange.com/a/332467
+        cmd = ['fish', '-c']
+
+    args = []
+    def append_fn_to_args(fn, rel=True):
+        if rel:
+            fn = relpath(fn, cwd)
+        escaped_fn = fn.replace("'", "\\'")
+        escaped_fn = f"'{escaped_fn}'"
+        if escaped_fn not in args:
+            args.append(escaped_fn)
+
+    # Pull up to 10 files closest to the idx in history to print first for easy hopping
+    h = history(boss.active_tab)
+    backidx = h.idx - 1
+    foreidx = h.idx
+    while len(args) < 10 and (backidx >= 0 or foreidx < len(h.locations) - 1):
+        if backidx >= 0:
+            append_fn_to_args(h.locations[backidx].fn)
+            backidx -= 1
+        if foreidx < len(h.locations) - 1:
+            append_fn_to_args(h.locations[foreidx].fn)
+            foreidx += 1
+
+    if is_vis_window(win):
+        loc, _, _ = parse_status(win)
+        args.append('--current')
+        append_fn_to_args(loc.fn, rel=False)
+
+    # Pass the command to fish as a single string so it'll do interpolation
+    cmd.append(f'source ~/dev/catherd/fzf_fd.fish {" ".join(args)}')
+
+    l.info("Running cmd=%s with kwargs=%s", cmd, kwargs)
+    new_win = boss.active_tab.new_window(cmd=cmd, overlay_for=win.id, **kwargs)
     def on_close_wrapper(b, w, d):
         try:
             on_close(b, w, d)
         except:
             l.exception("on_close no bueno")
     new_win.watchers.on_close.append(on_close_wrapper)
-
-    # Pull up to 10 files closest to the idx in history to print first for easy hopping
-    recents = []
-    def add_to_recent(idx):
-        fn = relpath(h.locations[idx].fn, cwd)
-        if fn not in recents:
-            recents.append(fn)
-    h = history(boss.active_tab)
-    backidx = h.idx - 1
-    foreidx = h.idx
-    while len(recents) < 10 and (backidx >= 0 or foreidx < len(h.locations) - 1):
-        if backidx >= 0:
-            add_to_recent(backidx)
-            backidx -= 1
-        if foreidx < len(h.locations) - 1:
-            add_to_recent(foreidx)
-            foreidx += 1
-    print_recents = f"""printf '%s\\n' '{"' '".join(recents)}'""" if recents else ''
-
-    excludes = [r for r in recents if not r.startswith('..')]
-    prox_sort = ''
-    if is_vis_window(win):
-        loc, _, _ = parse_status(win)
-        if loc.fn not in excludes:
-            excludes.append(loc.fn)
-        prox_sort = f" | proximity-sort '{loc.fn}'" # Sort by proximity to the current file if there is one
-    # Don't print any recents or the current file in fd
-    exclusions = f""" --exclude '{"' --exclude '".join(excludes)}'""" if excludes else ''
-
-    def run_later(timer_id):
-        run_in_shell(new_win, f'''set -l stdout (
-        begin
-            {print_recents}
-            fd --type file --hidden --follow --strip-cwd-prefix --exclude .git{exclusions}{prox_sort}
-        end |
-        fzf --tiebreak index
-    ) ; \
-    python ~/dev/catherd/kitten-result.py $status "$stdout" ; \
-    exit''')
-    # Hack to wait for ssh to finish logging in before pasting our command
-    add_timer(run_later, .1, False)
 
 def on_close(boss, window, data):
     res = window.kitten_result

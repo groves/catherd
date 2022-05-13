@@ -35,12 +35,7 @@ def history(tab):
     return h
 
 def is_vis_window(w):
-    if len(w.child.foreground_processes) != 1:
-        if len(w.child.foreground_processes) > 1:
-            l.info('Found window with multiple foreground_processes, assuming not vis w=%s fp=%s', w, w.child.foreground_processes)
-        return False
-    process = w.child.foreground_processes[0]
-    return process['cmdline'][0].endswith('/vis')
+    return ' vis ' in w.title or w.title.startswith('vis')
 
 def find_vis_window(boss):
     for possible in boss.active_tab.windows:
@@ -113,7 +108,7 @@ def edit(boss, fn, line=0, col=0, back=False):
         edit_win = find_vis_window(boss)
         l.info("Finding for edit found %s", edit_win)
         if edit_win is None:
-            run_in_shell(boss.active_window_for_cwd, f"vise +{address_cmd} '{fn}'")
+            run_in_shell(boss.active_window_for_cwd, f"vis +{address_cmd} '{fn}'")
             return
 
     current_loc, modified, mode = parse_status(edit_win)
