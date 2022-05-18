@@ -108,7 +108,8 @@ def edit(boss, fn, line=0, col=0, back=False):
         edit_win = find_vis_window(boss)
         l.info("Finding for edit found %s", edit_win)
         if edit_win is None:
-            run_in_shell(boss.active_window_for_cwd, f"vis +{address_cmd} '{fn}'")
+            address_invocation = f'+{address_cmd} ' if line != 0 or col != 0 else ''
+            run_in_shell(boss.active_window_for_cwd, f"vis {address_invocation}'{fn}'")
             return
 
     current_loc, modified, mode = parse_status(edit_win)

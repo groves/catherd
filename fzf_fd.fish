@@ -9,7 +9,7 @@ for arg in $argv
 end
 set -l stdout (
     begin
-        printf %s\n $argv
+        if set -q argv[1] ; printf %s\n $argv ; end
         fd --type file --hidden --follow --strip-cwd-prefix --exclude .git $excludes | proximity-sort $_flag_current
     end | fzf --tiebreak index
 )
