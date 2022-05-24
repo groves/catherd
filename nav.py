@@ -35,7 +35,7 @@ def history(tab):
     return h
 
 def is_vis_window(w):
-    return ' vis ' in w.title or w.title.startswith('vis')
+    return ' vis ' in w.title or w.title.startswith('vis') or w.title.startswith('./vis')
 
 def find_vis_window(boss):
     for possible in boss.active_tab.windows:
@@ -43,9 +43,15 @@ def find_vis_window(boss):
             return possible
     return None
 
+def find_shell_window(boss):
+    for possible in boss.active_tab.windows:
+        if possible.child.foreground_processes[0]['cmdline'][0] == '-fish':
+            return possible
+    return None
+
 _status_re = compile('\s*(?P<mode>INSERT » |VISUAL » |VISUAL-LINE » )?(?P<fn>.+?)(?P<modified> \[\+\])?\s+ (?:g « )?\d+% « (?P<line>\d+), (?P<col>\d+)\s*')
 def parse_status(win):
-    for line in reversed(win.as_text().split('\n')):
+    for line in reversed(win.as_text().split('\n')[-5:]):
         l.info("Matching against %s", line)
         m = _status_re.match(line)
         if not m:

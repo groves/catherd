@@ -36,30 +36,33 @@ def open_window(boss):
         cmd = ['fish', '-c']
 
     args = []
-    def append_fn_to_args(fn, rel=True):
-        if rel:
-            fn = relpath(fn, cwd)
+
+    def escape_fn_for_args(fn):
         escaped_fn = fn.replace("'", "\\'")
-        escaped_fn = f"'{escaped_fn}'"
-        if escaped_fn not in args:
-            args.append(escaped_fn)
+        return f"'{escaped_fn}'"
+
+    if is_vis_window(win):
+        loc, _, _ = parse_status(win)
+        args += ['--current', escape_fn_for_args(loc.fn)]
 
     # Pull up to 10 files closest to the idx in history to print first for easy hopping
     h = history(boss.active_tab)
+    def append_history_to_args(idx):
+        fn = h.locations[idx].fn
+        fn = relpath(fn, cwd)
+        escaped_fn = escape_fn_for_args(fn)
+        if escaped_fn not in args:
+            args.append(escaped_fn)
     backidx = h.idx - 1
     foreidx = h.idx
     while len(args) < 10 and (backidx >= 0 or foreidx < len(h.locations) - 1):
         if backidx >= 0:
-            append_fn_to_args(h.locations[backidx].fn)
+            append_history_to_args(backidx)
             backidx -= 1
         if foreidx < len(h.locations) - 1:
-            append_fn_to_args(h.locations[foreidx].fn)
+            append_history_to_args(foreidx)
             foreidx += 1
 
-    if is_vis_window(win):
-        loc, _, _ = parse_status(win)
-        args.append('--current')
-        append_fn_to_args(loc.fn, rel=False)
 
     # Pass the command to fish as a single string so it'll do interpolation
     cmd.append(f'source ~/dev/catherd/fzf_fd.fish {" ".join(args)}')

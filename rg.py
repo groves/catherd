@@ -2,7 +2,7 @@ import importer
 importer.reload_catherd_modules()
 from kittens.tui.handler import result_handler
 from log import logger
-from nav import parse_status, run_in_shell
+from nav import find_shell_window, parse_status, run_in_shell
 
 l = logger('catherd.rg')
 
@@ -16,12 +16,6 @@ def handle_result(args, answer, target_window_id, boss):
     except:
         l.exception("rg blew chunks!")
 
-
-def _find_shell(boss):
-    for possible in boss.active_tab.windows:
-        if possible.child.foreground_processes[0]['cmdline'][0] == '-fish':
-            return possible
-    return None
 
 def rg(boss, args):
     reference = args[1] == 'reference'
@@ -59,7 +53,7 @@ def rg(boss, args):
     type_flag = f' --type {rg_type}' if rg_type is not None else ''
     cmd = f"rg --context 2 '{query}'{type_flag}"
     
-    shell_win = _find_shell(boss)
+    shell_win = find_shell_window(boss)
     l.info("Got shell=%s, query=%s, loc=%s, rg_type=%s", shell_win, query, loc.fn, rg_type)
     if shell_win is None:
         l.info("No bare shell window, bailing")
