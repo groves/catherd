@@ -1,7 +1,8 @@
 import importer
 importer.reload_catherd_modules()
 from log import logger
-from kitty.fast_data_types import KeyEvent, GLFW_FKEY_ENTER, GLFW_FKEY_UP, GLFW_MOD_CONTROL
+from nav import send_control_c
+from kitty.fast_data_types import KeyEvent, GLFW_FKEY_ENTER, GLFW_FKEY_UP
 from kittens.tui.handler import result_handler
 
 l = logger('catherd.reterm')
@@ -16,10 +17,7 @@ def handle_result(args, answer, target_window_id, boss):
     except:
         l.exception("reterm blew chunks!")
 
-
-keys = [KeyEvent(key=ord('c'), mods=GLFW_MOD_CONTROL),
-    KeyEvent(key=GLFW_FKEY_UP),
-    KeyEvent(key=GLFW_FKEY_ENTER)]
+keys = [KeyEvent(key=GLFW_FKEY_UP), KeyEvent(key=GLFW_FKEY_ENTER)]
 
 _id_attr = '_catherd.reterm.window_id'
 def reterm(boss):
@@ -36,5 +34,6 @@ def reterm(boss):
     if win is None:
         return
     setattr(tab, _id_attr, win.id)
+    send_control_c(win)
     encoded_keys = b''.join(win.encoded_key(key) for key in keys)
     win.write_to_child(encoded_keys)

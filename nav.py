@@ -71,6 +71,10 @@ def _send_command(w, command):
     w.write_to_child(keys)
     w.write_to_child(w.encoded_key(_enter))
 
+_ctrl_c = KeyEvent(key=ord('c'), mods=GLFW_MOD_CONTROL)
+def send_control_c(win):
+    win.write_to_child(win.encoded_key(_ctrl_c))
+
 def run_in_shell(win, command):
     l.info("Running '%s' in %s", command, win)
     win.paste_text(command)
