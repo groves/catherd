@@ -21,4 +21,4 @@ def handle_result(args, answer, target_window_id, boss):
 def hint_shell(boss):
     win = find_shell_window(boss)
     args = ["--customize-processing", "hint_rg.py", "--alphabet", "abcdefghijklmnopqrstuvwxyz", "--hints-offset=0"]
-    boss._run_kitten('hints',  args=args, window=win)
+    boss.run_kitten_with_metadata('hints',  args=args, window=win)

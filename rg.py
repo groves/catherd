@@ -71,6 +71,6 @@ def rg(boss, args):
         l.info("No bare shell window, bailing")
         return
     
-    # Clear out any partial commands entered. TODO find a shell most recently used for rg that isn't running a command
+    # Clear out any partial commands entered
     send_control_c(shell_win)
     run_in_shell(shell_win, cmd)
