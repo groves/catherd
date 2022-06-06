@@ -1,9 +1,10 @@
 import importer
 importer.reload_catherd_modules()
 from log import logger
-from kittens.ssh.main import set_cwd_in_cmdline
+from kittens.ssh.main import connection_sharing_args
 from kittens.tui.handler import result_handler
 from nav import cwd_in_win, edit, history, is_vis_window, parse_status
+from os import getpid
 from os.path import relpath
 
 l = logger('catherd.edit')
@@ -25,10 +26,16 @@ def open_window(boss):
     kwargs = {}
     ssh_kitten_cmdline =  win.ssh_kitten_cmdline()
     if ssh_kitten_cmdline:
-        cmd = ssh_kitten_cmdline
-        set_cwd_in_cmdline(cwd, cmd)
-        # Attach a tty to the shell since we want to interact with fzf
-        cmd.append('-t')
+        # Use ssh directly rather than the ssh kitten as the ssh kitten has to send a bunch of
+        # setup stuff we don't need that is noticeably slow
+        cmd = ['ssh']
+        # Use the ssh kitten's control socket though to keep from having to create a connection
+        cmd.extend(connection_sharing_args(None, getpid()))
+        # Request a tty so we can interact with fzf, assume the final arg to the ssh kitten is the
+        # hostname, and cd into the current remote directory. SSH joins all trailing arguments with
+        # a space and passes them to the user's shell, so starting with cd like this gets us to the
+        # right place
+        cmd.extend(['-t', ssh_kitten_cmdline[-1], f'cd {cwd};'])
     else:
         kwargs['cwd'] = cwd
         # `ssh command` implicitly runs the user's shell with -c, so we need to do that explicitly for local execution
