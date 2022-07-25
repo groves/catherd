@@ -3,9 +3,8 @@ importer.reload_catherd_modules()
 from log import logger
 from kittens.ssh.main import connection_sharing_args
 from kittens.tui.handler import result_handler
-from nav import cwd_in_win, edit, history, is_vis_window, parse_status
+from nav import cwd_in_win, edit
 from os import getpid
-from os.path import relpath
 
 l = logger('catherd.edit')
 
@@ -42,37 +41,8 @@ def open_window(boss):
         # https://unix.stackexchange.com/a/332467
         cmd = ['fish', '-c']
 
-    args = []
-
-    def escape_fn_for_args(fn):
-        escaped_fn = fn.replace("'", "\\'")
-        return f"'{escaped_fn}'"
-
-    if is_vis_window(win):
-        loc, _, _ = parse_status(win)
-        args += ['--current', escape_fn_for_args(loc.fn)]
-
-    # Pull up to 10 files closest to the idx in history to print first for easy hopping
-    h = history(boss.active_tab)
-    def append_history_to_args(idx):
-        fn = h.locations[idx].fn
-        fn = relpath(fn, cwd)
-        escaped_fn = escape_fn_for_args(fn)
-        if escaped_fn not in args:
-            args.append(escaped_fn)
-    backidx = h.idx - 1
-    foreidx = h.idx
-    while len(args) < 10 and (backidx >= 0 or foreidx < len(h.locations) - 1):
-        if backidx >= 0:
-            append_history_to_args(backidx)
-            backidx -= 1
-        if foreidx < len(h.locations) - 1:
-            append_history_to_args(foreidx)
-            foreidx += 1
-
-
     # Pass the command to fish as a single string so it'll do interpolation
-    cmd.append(f'source ~/dev/catherd/fzf_fd.fish {" ".join(args)}')
+    cmd.append(f'source ~/dev/catherd/fzf_fd.fish')
 
     l.info("Running cmd=%s with kwargs=%s", cmd, kwargs)
     new_win = boss.active_tab.new_window(cmd=cmd, overlay_for=win.id, **kwargs)

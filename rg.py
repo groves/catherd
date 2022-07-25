@@ -2,7 +2,7 @@ import importer
 importer.reload_catherd_modules()
 from kittens.tui.handler import result_handler
 from log import logger
-from nav import find_shell_window, is_vis_window, parse_status, run_in_shell, send_control_c
+from nav import find_shell_window, is_editor_window, parse_status, run_in_shell, send_control_c
 
 l = logger('catherd.rg')
 
@@ -25,9 +25,9 @@ def rg(boss, args):
         query = win.text_for_selection()
         if query == '':
             return None, None, None
-        if is_vis_window(win):
-            loc, _, _ = parse_status(win)
-            ext = loc.fn.split('.')[-1]
+        if is_editor_window(win):
+            fn, _, _ = parse_status(win)
+            ext = fn.split('.')[-1]
             rg_type = None
             if ext == 'py':
                 rg_type = 'py'
@@ -35,14 +35,14 @@ def rg(boss, args):
                 rg_type = 'c'
             elif ext == 'lua':
                 rg_type = 'lua'
-            return query, loc, rg_type
+            return query, fn, rg_type
         return query, None, None
 
     # Look for a query in the active window first, then try the rest in the tab
-    query, loc, rg_type = extract_query(boss.active_window)
+    query, fn, rg_type = extract_query(boss.active_window)
     if query is None:
         for win in boss.active_tab.windows:
-            query, loc, rg_type = extract_query(win)
+            query, fn, rg_type = extract_query(win)
             if query is not None:
                 break
         else:
@@ -67,7 +67,7 @@ def rg(boss, args):
     cmd = f"rg --context 2 '{query}'{type_flag}"
     
     shell_win = find_shell_window(boss)
-    l.info("Got shell=%s, query=%s, loc=%s, rg_type=%s", shell_win, query, loc.fn if loc else None, rg_type)
+    l.info("Got shell=%s, query=%s, fn=%s, rg_type=%s", shell_win, query, fn, rg_type)
     if shell_win is None:
         l.info("No bare shell window, bailing")
         return
