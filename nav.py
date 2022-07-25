@@ -43,9 +43,20 @@ def find_vis_window(boss):
             return possible
     return None
 
+def is_shell_window(possible):
+    # Fish titles are ([remote hostname] )? (process other than fish running )? (cwd starting with ~ or /)
+    title = possible.title
+    if title.startswith('['):
+        title = title[title.find(']') + 2:]
+    words = title.split(' ')
+    l.info('Possible title=%s, words=%s', possible.title, words)
+    return len(words) == 1 or words[1].startswith('~') or words[1].startswith('/')
+
 def find_shell_window(boss):
+    if is_shell_window(boss.active_window):
+        return boss.active_window
     for possible in boss.active_tab.windows:
-        if possible.child.foreground_processes[0]['cmdline'][0] == '-fish':
+        if is_shell_window(possible):
             return possible
     return None
 

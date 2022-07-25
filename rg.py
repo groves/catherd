@@ -28,6 +28,7 @@ def rg(boss, args):
         if is_vis_window(win):
             loc, _, _ = parse_status(win)
             ext = loc.fn.split('.')[-1]
+            rg_type = None
             if ext == 'py':
                 rg_type = 'py'
             elif ext in ['c', 'h']:

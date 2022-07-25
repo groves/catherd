@@ -30,7 +30,7 @@ def open_window(boss):
         # setup stuff we don't need that is noticeably slow
         cmd = ['ssh']
         # Use the ssh kitten's control socket though to keep from having to create a connection
-        cmd.extend(connection_sharing_args(None, getpid()))
+        cmd.extend(connection_sharing_args(getpid()))
         # Request a tty so we can interact with fzf, assume the final arg to the ssh kitten is the
         # hostname, and cd into the current remote directory. SSH joins all trailing arguments with
         # a space and passes them to the user's shell, so starting with cd like this gets us to the
