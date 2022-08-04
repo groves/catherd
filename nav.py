@@ -8,8 +8,11 @@ l = logger('catherd.nav')
 
 def is_editor_window(w):
     EDITOR_NAMES = ['hx', 'HELIX_RUNTIME']
+    title = w.title
+    if title.startswith('['):
+        title = title[title.find('] ') + 2:]
     for name in EDITOR_NAMES:
-        if f' {name} ' in w.title or w.title.startswith(name) or w.title.startswith(f'./{name}'):
+        if f' {name} ' in title or title.startswith(name) or title.startswith(f'./{name}'):
             return True
     return False
 
@@ -36,7 +39,7 @@ def find_shell_window(boss):
             return possible
     return None
 
-_status_re = compile(' (?P<mode>INS|NOR|SEL)   (?P<fn>.+?)(?P<modified>\[\+\])?      .+')
+_status_re = compile(' (?P<mode>INS|NOR|SEL) . (?P<fn>.+?)(?P<modified>\[\+\])?      .+')
 def parse_status(win):
     for line in reversed(win.as_text().split('\n')[-5:]):
         l.info("Matching against %s", line)
@@ -106,4 +109,4 @@ def edit(boss, fn, line=0, col=0, back=False):
         _send_command(edit_win, 'w')
     _send_command(edit_win, f'o {fn}')
     if line != 0:
-        _send_keys(f'g{line}g')
+        _send_keys(edit_win, f'g{line}g')

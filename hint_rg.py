@@ -21,7 +21,7 @@ def mark(text, args, Mark, extra_cli_args, *a):
                 prev_line = None
             if fn and m.group('line_type') == ':':
                 start, end = m.span()
-                yield Mark(idx, start, end, line, {'line':int(m.group('line_num')) - 1, 'fn':fn})
+                yield Mark(idx, start, end, line, {'line':int(m.group('line_num')), 'fn':fn})
                 idx += 1
         elif m.group('separator'):
             continue
