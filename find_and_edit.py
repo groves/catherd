@@ -48,14 +48,14 @@ def open_window(boss):
     new_win = boss.active_tab.new_window(cmd=cmd, overlay_for=win.id, **kwargs)
     def on_close_wrapper(b, w, d):
         try:
-            on_close(b, w, d)
+            on_close(b, w, d, cwd)
         except:
             l.exception("on_close no bueno")
     new_win.watchers.on_close.append(on_close_wrapper)
 
-def on_close(boss, window, data):
+def on_close(boss, window, data, cwd):
     res = window.kitten_result
     if res["returncode"] != 0:
         l.info("Non-zero returncode %s", res["returncode"])
         return
-    edit(boss, res["stdout"])
+    edit(boss, f'{cwd}/{res["stdout"]}')

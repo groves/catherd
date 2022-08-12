@@ -42,7 +42,6 @@ def find_shell_window(boss):
 _status_re = compile(' (?P<mode>INS|NOR|SEL) . (?P<fn>.+?)(?P<modified>\[\+\])?      .+')
 def parse_status(win):
     for line in reversed(win.as_text().split('\n')[-5:]):
-        l.info("Matching against %s", line)
         m = _status_re.match(line)
         if not m:
             continue
@@ -55,9 +54,15 @@ def _send_keys(w, keys):
     encoded = b''.join(w.encoded_key(KeyEvent(key=ord(c))) for c in keys)
     w.write_to_child(encoded)
 
+import time
 _enter = KeyEvent(key=GLFW_FKEY_ENTER)
 def _send_command(w, command):
-    _send_keys(w, 'o' + command)
+    l.info("Sending command '%s'", command)
+    _send_keys(w, 'o')
+    # Send with bracketed paste as helix is slow on input
+    w.write_to_child(b'\x1b[200~')
+    w.write_to_child(command)
+    w.write_to_child(b'\x1b[201~')
     w.write_to_child(w.encoded_key(_enter))
 
 _ctrl_c = KeyEvent(key=ord('c'), mods=GLFW_MOD_CONTROL)
@@ -76,18 +81,26 @@ def cwd_in_win(win):
     return path_from_osc7_url(cwd)
 
 def abspath_in_win(win, fn):
-    cwd = cwd_in_win(win)
-    l.info('cwd=%s fn=%s', cwd, fn)
     if not fn.startswith('/'):
+        cwd = cwd_in_win(win)
         fn = f'{cwd}/{fn}'
-    l.info('fn=%s, np=%s', fn, normpath(fn))
     return normpath(fn)
 
-def edit(boss, fn, line=0, col=0, back=False):
-    # active_window_for_cwd uses the base of the active window group. If a kitten is running, active_window is an overlay on top of the window that invoked the kitten
-    fn = abspath_in_win(boss.active_window_for_cwd, fn)
-    l.info("Edit %s", fn)
+def _minimal_address(boss, fn, line, col):
+    # active_window_for_cwd uses the base of the active window group.
+    # If a kitten is running, active_window is an overlay on top of the window that invoked the kitten
+    cwd = cwd_in_win(boss.active_window_for_cwd)
+    if fn.startswith(cwd):
+        fn = fn[len(cwd) + 1:]
+    address = fn
+    if line > 1:
+        address += f':{line}'
+        if col > 1:
+            address += f':{col}'
+    return address
 
+def edit(boss, fn, line=1, col=1):
+    l.info("Edit %s:%s:%s", fn, line, col)
     if is_editor_window(boss.active_window_for_cwd):
         l.info("Using active for edit")
         edit_win = boss.active_window_for_cwd
@@ -95,8 +108,7 @@ def edit(boss, fn, line=0, col=0, back=False):
         edit_win = find_editor_window(boss)
         l.info("Finding for edit found %s", edit_win)
         if edit_win is None:
-            address_invocation = f':{line}:{col}'
-            run_in_shell(boss.active_window_for_cwd, f"hx '{fn}{address_invocation}'")
+            run_in_shell(boss.active_window_for_cwd, f"hx '{_minimal_address(boss, fn, line, col)}'")
             return
         boss.set_active_window(edit_win)
 
@@ -107,6 +119,4 @@ def edit(boss, fn, line=0, col=0, back=False):
         edit_win.write_to_child(edit_win.encoded_key(KeyEvent(key=ord('x'), mods=GLFW_MOD_CONTROL)))
     if modified:
         _send_command(edit_win, 'w')
-    _send_command(edit_win, f'o {fn}')
-    if line != 0:
-        _send_keys(edit_win, f'g{line}g')
+    _send_command(edit_win, f'o {_minimal_address(boss, fn, line, col)}')
