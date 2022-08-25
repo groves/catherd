@@ -10,7 +10,7 @@ end
 set -l stdout (
     begin
         if set -q argv[1] ; printf %s\n $argv ; end
-        fd --type file --hidden --follow --strip-cwd-prefix --exclude .git $excludes | proximity-sort $_flag_current
+        fd --type file --hidden --follow --strip-cwd-prefix --exclude .git $excludes
     end | fzf --tiebreak index
 )
 python3 ~/dev/catherd/kitten-result.py $status "$stdout"
