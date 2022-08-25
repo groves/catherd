@@ -29,7 +29,7 @@ def is_shell_window(possible):
         title = title[title.find(']') + 2:]
     words = title.split(' ')
     l.info('Possible title=%s, words=%s', possible.title, words)
-    return len(words) == 1 or words[1].startswith('~') or words[1].startswith('/')
+    return len(words) == 1 or words[1].startswith('~') or words[1].startswith('/') or words[0] == 'git'
 
 def find_shell_window(boss):
     if is_shell_window(boss.active_window):
@@ -42,7 +42,7 @@ def find_shell_window(boss):
 _status_re = compile(' (?P<mode>INS|NOR|SEL) . (?P<fn>.+?)(?P<modified>\[\+\])?      .+')
 def parse_status(win):
     for line in reversed(win.as_text().split('\n')[-5:]):
-        m = _status_re.match(line)
+        m = _status_re.search(line)
         if not m:
             continue
         mode, fn, modified = m.groups()
