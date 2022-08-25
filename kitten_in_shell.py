@@ -25,4 +25,3 @@ def kitten_in_shell(args, target_window_id, boss):
     setattr(boss, _pre_shell_win_id, target_window_id)
     win = find_shell_window(boss)
     boss.run_kitten_with_metadata(args[1], window=win)
-    l.info(args[1])
