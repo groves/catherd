@@ -20,5 +20,20 @@ def handle_result(args, answer, target_window_id, boss):
         l.exception('edit blew chunks!')
 
 def open_editor(boss, args):
-    fn = abspath_in_win(boss.active_window, args[1])
-    edit(boss, fn)
+    fn = args[1]
+    line = 1
+    col = 1
+    if fn.startswith("file://"):
+        fn = fn[len("file://"):]
+        fn = fn[fn.index("/"):]
+        anchor_idx = fn.find('#')
+        if anchor_idx != -1:
+            anchor = fn[anchor_idx + 1:]
+            if ':' in anchor:
+                line, col = [int(s) for s in anchor.split(':')]
+            else:
+                line = int(anchor)
+            fn = fn[:anchor_idx]
+    l.info("%s %s %s, %s", args, fn, line, col)
+    fn = abspath_in_win(boss.active_window, fn)
+    edit(boss, fn, line, col)
