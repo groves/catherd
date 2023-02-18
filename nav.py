@@ -1,4 +1,4 @@
-from kitty.fast_data_types import KeyEvent, GLFW_FKEY_ENTER, GLFW_MOD_CONTROL
+from kitty.fast_data_types import KeyEvent, GLFW_FKEY_ENTER, GLFW_MOD_CONTROL, GLFW_FKEY_ESCAPE
 from kitty.utils import path_from_osc7_url
 from log import logger
 from os.path import normpath
@@ -114,9 +114,8 @@ def edit(boss, fn, line=1, col=1):
 
     _, modified, mode = parse_status(edit_win)
     if mode != 'NOR':
-        # TODO See if this applies to helix
-        # Use C-x to exit INS or SEL mode to avoid weirdness with escdelay in vis
-        edit_win.write_to_child(edit_win.encoded_key(KeyEvent(key=ord('x'), mods=GLFW_MOD_CONTROL)))
+        # Use esc to exit INS or SEL
+        edit_win.write_to_child(edit_win.encoded_key(KeyEvent(key=GLFW_FKEY_ESCAPE)))
     if modified:
         _send_command(edit_win, 'w')
     _send_command(edit_win, f'o {_minimal_address(boss, fn, line, col)}')
