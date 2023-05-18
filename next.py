@@ -21,8 +21,9 @@ def handle_result(args, answer, target_window_id, boss):
 
 def find_ate_window(boss):
     for possible in boss.active_tab.windows:
-        if 'ate' in possible.title.split(' '):
-            return possible
+        for app in [',cargo', 'ate']:
+            if app in possible.title.split(' '):
+                return possible
     return None
 
 def next_match(boss, args):
