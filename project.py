@@ -42,7 +42,7 @@ def main(args):
 @result_handler()
 def handle_result(args, answer, target_window_id, boss):
     try:
-        open_project(boss, answer)
+        open_project(boss, answer, len(args) > 1 and args[1] == "attach")
     except:
         l.exception("project blew chunks!")
 
@@ -57,7 +57,7 @@ def find_proj(project):
     raise Exception(f"No {project} dir in {proj_dirs}")
 
 
-def open_project(boss, project):
+def open_project(boss, project, attach):
     project_dir = find_proj(project).as_posix()
     l.info(f"Opening {project_dir}")
 
@@ -73,10 +73,13 @@ def open_project(boss, project):
     if not found:
         boss.new_tab_with_wd(project_dir)
     else:
-        target_os_window_id = boss.active_tab.tab_manager_ref().os_window_id
-        if found.tabref().tab_manager_ref().os_window_id != target_os_window_id:
-            l.info(f"Moving existing to a tab for {project_dir}")
-            boss._move_tab_to(found.tabref(), target_os_window_id=target_os_window_id)
-        else:
-            l.info(f"{project_dir} already in tab in current window, only focusing")
+        if attach:
+            target_os_window_id = boss.active_tab.tab_manager_ref().os_window_id
+            if found.tabref().tab_manager_ref().os_window_id != target_os_window_id:
+                l.info(f"Moving existing to a tab for {project_dir}")
+                boss._move_tab_to(
+                    found.tabref(), target_os_window_id=target_os_window_id
+                )
+            else:
+                l.info(f"{project_dir} already in tab in current window, only focusing")
         boss.set_active_window(found, switch_os_window_if_needed=True)
