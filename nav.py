@@ -58,20 +58,6 @@ def find_shell_window(boss):
     return None
 
 
-_status_re = compile("(?P<mode>INS|NOR|SEL) . (?P<fn>.+?)(?P<modified>\\[\\+\\])? ")
-
-
-def parse_status(win):
-    for line in reversed(win.as_text().split("\n")[-5:]):
-        m = _status_re.search(line)
-        if not m:
-            continue
-        mode, fn, modified = m.groups()
-        l.info("Found %s %s modified=%s", fn, mode, modified)
-        return fn, modified is not None, mode
-    raise Exception(f"Couldn't find status in any line in {win}")
-
-
 def _send_keys(w, keys):
     encoded = b"".join(w.encoded_key(KeyEvent(key=ord(c))) for c in keys)
     w.write_to_child(encoded)
@@ -149,10 +135,6 @@ def edit(boss, fn, line=1, col=1):
             return
         boss.set_active_window(edit_win)
 
-    _, modified, mode = parse_status(edit_win)
-    if mode != "NOR":
-        # Use esc to exit INS or SEL
-        edit_win.write_to_child(edit_win.encoded_key(KeyEvent(key=GLFW_FKEY_ESCAPE)))
-    if modified:
-        _send_command(edit_win, "w")
+    edit_win.write_to_child(edit_win.encoded_key(KeyEvent(key=GLFW_FKEY_ESCAPE)))
+    _send_command(edit_win, "w")
     _send_command(edit_win, f"o {_minimal_address(boss, fn, line, col)}")
