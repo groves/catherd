@@ -5,17 +5,19 @@ if len(path) == 0 or path[0] != "/Users/groves/.config/kitty":
 import importer
 
 importer.reload_catherd_modules()
-from log import logger
+from log import logger, cache_dir
 from kittens.tui.handler import result_handler
 from nav import abspath_in_win, edit
 from pathlib import Path
 from subprocess import run, PIPE
+from json import dump, load
+from os.path import exists
 
 l = logger("catherd.project")
 
 
-proj_dir_names = ["code", "dev"]
-proj_dirs = [Path(f"~/{d}").expanduser() for d in proj_dir_names]
+proj_dirs = [Path(f"~/{d}").expanduser() for d in ["code", "dev", "code/idsb/stork"]]
+history_fn = f"{cache_dir}/project_history.json"
 
 
 def fzf(options):
@@ -33,10 +35,19 @@ def fzf(options):
     return completed.stdout.decode().strip()
 
 
+def proj_paths():
+    return [p for d in proj_dirs for p in d.iterdir() if p.is_dir()]
+
+
+def proj_names():
+    return [p.name for d in proj_dirs for p in d.iterdir() if p.is_dir()]
+
+
 def main(args):
-    return fzf(
-        [p.name for d in proj_dirs for p in d.iterdir() if p.is_dir()] + proj_dir_names
-    )
+    # Don't make the first item in history first as we're probably in that project
+    history = load(open(history_fn))[1:] if exists(history_fn) else []
+    all = proj_names()
+    return fzf([h for h in history if h in all] + [p for p in all if p not in history])
 
 
 @result_handler()
@@ -48,8 +59,6 @@ def handle_result(args, answer, target_window_id, boss):
 
 
 def find_proj(project):
-    if project in proj_dir_names:
-        return Path(f"~/{project}").expanduser()
     for d in proj_dirs:
         sub = d / project
         if sub.exists() and sub.is_dir():
@@ -58,15 +67,22 @@ def find_proj(project):
 
 
 def open_project(boss, project, attach):
-    project_dir = find_proj(project).as_posix()
+    project_dir = find_proj(project).as_posix() + "/"
     l.info(f"Opening {project_dir}")
+    all_dirs = [p.as_posix() + "/" for p in proj_paths()]
 
     found = None
     for w in boss.all_windows:
-        old_fore = w.child.get_foreground_cwd(oldest=True)
-        matches = old_fore.startswith(project_dir)
+        old_fore = w.child.get_foreground_cwd(oldest=True) + "/"
+        longest_prefix = 0
+        w_project = None
+        for p in all_dirs:
+            if old_fore.startswith(p) and len(p) > longest_prefix:
+                longest_prefix = len(p)
+                w_project = p
+        matches = w_project == project_dir
         l.info(
-            f"{matches} {w.title} {old_fore} {w.child.get_foreground_cwd(oldest=False)} {w.child.cwd}"
+            f"matches={matches} old_fore={old_fore} w_project={w_project} title={w.title}"
         )
         if matches:
             found = w
@@ -83,3 +99,7 @@ def open_project(boss, project, attach):
             else:
                 l.info(f"{project_dir} already in tab in current window, only focusing")
         boss.set_active_window(found, switch_os_window_if_needed=True)
+    history = load(open(history_fn)) if exists(history_fn) else []
+    all = proj_names()
+    history = [project] + [p for p in history if p != project and p in all]
+    dump(history, open(history_fn, "w"))
