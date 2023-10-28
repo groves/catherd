@@ -71,7 +71,7 @@ def open_project(boss, project, attach):
     l.info(f"Opening {project_dir}")
     all_dirs = [p.as_posix() + "/" for p in proj_paths()]
 
-    found = None
+    found = []
     for w in boss.all_windows:
         old_fore = w.child.get_foreground_cwd(oldest=True) + "/"
         longest_prefix = 0
@@ -82,23 +82,22 @@ def open_project(boss, project, attach):
                 w_project = p
         matches = w_project == project_dir
         l.info(
-            f"matches={matches} old_fore={old_fore} w_project={w_project} title={w.title}"
+            f"matches={matches} old_fore={old_fore} w_project={w_project} title={w.title} lfa={w.last_focused_at}"
         )
         if matches:
-            found = w
+            found.append(w)
     if not found:
         boss.new_tab_with_wd(project_dir)
     else:
+        w = sorted(found, key=lambda w: w.last_focused_at, reverse=True)[0]
         if attach:
             target_os_window_id = boss.active_tab.tab_manager_ref().os_window_id
-            if found.tabref().tab_manager_ref().os_window_id != target_os_window_id:
+            if w.tabref().tab_manager_ref().os_window_id != target_os_window_id:
                 l.info(f"Moving existing to a tab for {project_dir}")
-                boss._move_tab_to(
-                    found.tabref(), target_os_window_id=target_os_window_id
-                )
+                boss._move_tab_to(w.tabref(), target_os_window_id=target_os_window_id)
             else:
                 l.info(f"{project_dir} already in tab in current window, only focusing")
-        boss.set_active_window(found, switch_os_window_if_needed=True)
+        boss.set_active_window(w, switch_os_window_if_needed=True)
     history = load(open(history_fn)) if exists(history_fn) else []
     all = proj_names()
     history = [project] + [p for p in history if p != project and p in all]
