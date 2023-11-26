@@ -16,7 +16,10 @@ from os.path import exists
 l = logger("catherd.project")
 
 
-proj_dirs = [Path(f"~/{d}").expanduser() for d in ["code", "dev", "code/idsb/stork"]]
+proj_dirs = [
+    Path(f"~/{d}").expanduser()
+    for d in ["code", "dev", "code/idsb/stork", "code/idsb/.github"]
+]
 history_fn = f"{cache_dir}/project_history.json"
 
 

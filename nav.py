@@ -7,7 +7,6 @@ from kitty.fast_data_types import (
 from kitty.utils import path_from_osc7_url
 from log import logger
 from os.path import normpath
-from re import compile
 
 l = logger("catherd.nav")
 
@@ -34,36 +33,10 @@ def find_editor_window(boss):
     return None
 
 
-def is_shell_window(possible):
-    # Fish titles are ([remote hostname] )? (process other than fish running )? (cwd starting with ~ or /)
-    title = possible.title
-    if title.startswith("["):
-        title = title[title.find("]") + 2 :]
-    words = title.split(" ")
-    l.info("Possible title=%s, words=%s", possible.title, words)
-    return (
-        len(words) == 1
-        or words[1].startswith("~")
-        or words[1].startswith("/")
-        or words[0] == "git"
-    )
-
-
-def find_shell_window(boss):
-    if is_shell_window(boss.active_window):
-        return boss.active_window
-    for possible in boss.active_tab.windows:
-        if is_shell_window(possible):
-            return possible
-    return None
-
-
 def _send_keys(w, keys):
     encoded = b"".join(w.encoded_key(KeyEvent(key=ord(c))) for c in keys)
     w.write_to_child(encoded)
 
-
-import time
 
 _enter = KeyEvent(key=GLFW_FKEY_ENTER)
 
