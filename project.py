@@ -12,15 +12,27 @@ from pathlib import Path
 from subprocess import run, PIPE
 from json import dump, load
 from os.path import exists
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Thread
+from typing import NamedTuple, Any
 
 l = logger("catherd.project")
 
 
-proj_dirs = [Path(f"~/{d}").expanduser() for d in ["code", "dev", "clod"]]
+proj_dirs = [Path(f"~/{d}").expanduser() for d in ["code", "dev"]]
+clod_dir = Path("~/clod").expanduser()
+jj = Path("~/.nix-profile/bin/jj").expanduser()
 history_fn = f"{cache_dir}/project_history.json"
+clod_cache_fn = f"{cache_dir}/clod_info.json"
 
 
-def fzf(options):
+class WorkspaceInfo(NamedTuple):
+    description: str
+    changed: int
+    on_main: bool
+
+
+def fzf(options: list[str]) -> str | None:
     completed = run(
         Path("~/.nix-profile/bin/fzf").expanduser(),
         input="\n".join(options).encode(),
@@ -35,30 +47,143 @@ def fzf(options):
     return completed.stdout.decode().strip()
 
 
-def proj_paths():
-    return [p for d in proj_dirs for p in d.iterdir() if p.is_dir()]
+jj_info_template = 'parents.map(|p| p.bookmarks().join(",") ++ "|||" ++ p.description().first_line()).join("") ++ "\n"'
 
 
-def proj_names():
+def workspace_info(ws_dir: str) -> WorkspaceInfo:
+    result = run(
+        [str(jj), "log", "-r", "@", "--no-graph", "--summary", "-T", jj_info_template],
+        cwd=ws_dir,
+        stdout=PIPE,
+        stderr=PIPE,
+    )
+    if result.returncode != 0:
+        l.warning(f"jj failed in {ws_dir}: {result.stderr.decode().strip()}")
+        return WorkspaceInfo("", 0, False)
+    lines = result.stdout.decode().strip().split("\n")
+    header = lines[0] if lines else ""
+    parts = header.split("|||", 1)
+    on_main = "main" in parts[0]
+    description = parts[1] if len(parts) > 1 else ""
+    changed = len([line for line in lines[1:] if line.strip()])
+    return WorkspaceInfo(description, changed, on_main)
+
+
+def clod_workspaces() -> list[tuple[str, Path]]:
+    if not clod_dir.exists():
+        return []
+    tasks = []
+    for repo in sorted(clod_dir.iterdir()):
+        if not repo.is_dir() or not (repo / "main" / ".jj").exists():
+            continue
+        for ws in sorted(repo.iterdir()):
+            if (
+                ws.is_dir()
+                and (ws.name == "main" or ws.name.isdigit())
+                and (ws / ".jj").exists()
+            ):
+                tasks.append((f"{repo.name}/{ws.name}", ws))
+    return tasks
+
+
+def format_entry(ident: str, info: WorkspaceInfo | list[Any]) -> str:
+    description, changed, on_main = info
+    if changed == 0 and on_main:
+        return f"{ident}  [unused]"
+    return f"{ident}  ({changed} changed) {description[:50]}"
+
+
+def clod_entries() -> list[str]:
+    tasks = clod_workspaces()
+    cache = load(open(clod_cache_fn)) if exists(clod_cache_fn) else {}
+    return [
+        format_entry(ident, cache[ident]) if ident in cache else ident
+        for ident, _ in tasks
+    ]
+
+
+def update_history(project: str) -> None:
+    history = load(open(history_fn)) if exists(history_fn) else []
+    all_regular = set(proj_names())
+    all_clod = {ident for ident, _ in clod_workspaces()}
+    all_valid = all_regular | all_clod
+    history = [project] + [p for p in history if p != project and p in all_valid]
+    dump(history, open(history_fn, "w"))
+
+
+def background_update(project: str) -> None:
+    update_history(project)
+    refresh_clod_cache()
+
+
+def refresh_clod_cache() -> None:
+    tasks = clod_workspaces()
+    infos = {}
+    with ThreadPoolExecutor() as executor:
+        futures = {
+            executor.submit(workspace_info, str(ws_dir)): ident
+            for ident, ws_dir in tasks
+        }
+        for future in as_completed(futures):
+            ident = futures[future]
+            try:
+                infos[ident] = list(future.result())
+            except Exception:
+                l.exception(f"Failed to get workspace info for {ident}")
+                infos[ident] = ["", 0, False]
+    dump(infos, open(clod_cache_fn, "w"))
+
+
+def proj_paths() -> list[Path]:
+    return [p for d in proj_dirs for p in d.iterdir() if p.is_dir()] + [
+        ws for _, ws in clod_workspaces()
+    ]
+
+
+def proj_names() -> list[str]:
     return [p.name for d in proj_dirs for p in d.iterdir() if p.is_dir()]
 
 
-def main(args):
-    # Don't make the first item in history first as we're probably in that project
+def main(args: list[str]) -> str | None:
     history = load(open(history_fn))[1:] if exists(history_fn) else []
-    all = proj_names()
-    return fzf([h for h in history if h in all] + [p for p in all if p not in history])
+    regular = proj_names()
+    clod = clod_entries()
+    clod_by_ident = {e.split()[0]: e for e in clod}
+
+    all_by_ident = {p: p for p in regular} | clod_by_ident
+    ordered = []
+    for h in history:
+        if h in all_by_ident:
+            ordered.append(all_by_ident[h])
+    for ident in sorted(all_by_ident):
+        if ident not in history:
+            ordered.append(all_by_ident[ident])
+
+    result = fzf(ordered)
+    if result is None:
+        return None
+    return result.split()[0]
 
 
 @result_handler()
-def handle_result(args, answer, target_window_id, boss):
+def handle_result(
+    args: list[str], answer: str | None, target_window_id: int, boss: Any
+) -> None:
     try:
         open_project(boss, answer, len(args) > 1 and args[1] == "attach")
+        if answer:
+            Thread(target=background_update, args=(answer,), daemon=True).start()
     except:
         l.exception("project blew chunks!")
 
 
-def find_proj(project):
+def find_proj(project: str) -> Path:
+    if "/" in project:
+        repo, ws = project.split("/", 1)
+        sub = clod_dir / repo / ws
+        if sub.exists() and sub.is_dir():
+            return sub
+        raise Exception(f"No clod workspace {project}")
     for d in proj_dirs:
         sub = d / project
         if sub.exists() and sub.is_dir():
@@ -66,7 +191,9 @@ def find_proj(project):
     raise Exception(f"No {project} dir in {proj_dirs}")
 
 
-def open_project(boss, project, attach):
+def open_project(boss: Any, project: str | None, attach: bool) -> None:
+    if project is None:
+        return
     project_dir = find_proj(project).as_posix() + "/"
     l.info(f"Opening {project_dir}")
     all_dirs = [p.as_posix() + "/" for p in proj_paths()]
@@ -99,7 +226,3 @@ def open_project(boss, project, attach):
             else:
                 l.info(f"{project_dir} already in tab in current window, only focusing")
         boss.set_active_window(w, switch_os_window_if_needed=True)
-    history = load(open(history_fn)) if exists(history_fn) else []
-    all = proj_names()
-    history = [project] + [p for p in history if p != project and p in all]
-    dump(history, open(history_fn, "w"))
