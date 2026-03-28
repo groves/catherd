@@ -110,4 +110,4 @@ def edit(boss, fn, line=1, col=1):
 
     edit_win.write_to_child(edit_win.encoded_key(KeyEvent(key=GLFW_FKEY_ESCAPE)))
     _send_command(edit_win, "w")
-    _send_command(edit_win, f"o {_minimal_address(boss, fn, line, col)}")
+    _send_command(edit_win, f"o '{_minimal_address(boss, fn, line, col)}'")
