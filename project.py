@@ -16,10 +16,7 @@ from os.path import exists
 l = logger("catherd.project")
 
 
-proj_dirs = [
-    Path(f"~/{d}").expanduser()
-    for d in ["code", "dev", "code/idsb/stork", "code/idsb/.github"]
-]
+proj_dirs = [Path(f"~/{d}").expanduser() for d in ["code", "dev", "clod"]]
 history_fn = f"{cache_dir}/project_history.json"
 
 
@@ -91,8 +88,9 @@ def open_project(boss, project, attach):
             found.append(w)
     if not found:
         boss.new_tab_with_wd(project_dir)
+        boss.detach_tab()
     else:
-        w = sorted(found, key=lambda w: w.last_focused_at, reverse=True)[0]
+        w = sorted(found, key=lambda w: w.last_focused_at)[0]
         if attach:
             target_os_window_id = boss.active_tab.tab_manager_ref().os_window_id
             if w.tabref().tab_manager_ref().os_window_id != target_os_window_id:
