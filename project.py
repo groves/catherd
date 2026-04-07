@@ -7,7 +7,7 @@ import importer
 importer.reload_catherd_modules()
 from log import logger, cache_dir
 from kittens.tui.handler import result_handler
-from nav import abspath_in_win, edit
+from nav import abspath_in_win, edit, run_in_shell
 from pathlib import Path
 from subprocess import run, PIPE
 from json import dump, load
@@ -214,8 +214,14 @@ def open_project(boss: Any, project: str | None, attach: bool) -> None:
         if matches:
             found.append(w)
     if not found:
-        boss.new_tab_with_wd(project_dir)
-        boss.detach_tab()
+        active_win = boss.active_window_for_cwd
+        active_cwd = active_win.child.get_foreground_cwd(oldest=True) + "/"
+        in_project = any(active_cwd.startswith(p) for p in all_dirs)
+        if in_project:
+            boss.new_tab_with_wd(project_dir)
+            boss.detach_tab()
+        else:
+            run_in_shell(active_win, f"cd '{project_dir}'")
     else:
         w = sorted(found, key=lambda w: w.last_focused_at)[0]
         if attach:
